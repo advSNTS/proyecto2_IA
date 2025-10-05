@@ -359,3 +359,152 @@ class FNCConverter {
         return extractPredicates(text, negate);
     }
 }
+
+//-----Algoritmo de Resolución-----
+
+// Clase principal del motor de inferencia
+class ResolutionEngine {
+    private List<Clause> clauses;
+    private PrintWriter logWriter;
+    private int nextClauseId;
+    
+    public ResolutionEngine() {
+        this.clauses = new ArrayList<>();
+        this.nextClauseId = 1;
+    }
+    
+    public void initialize(List<String> sentences, String logFilePath) throws IOException {
+        this.logWriter = new PrintWriter(new FileWriter(logFilePath));
+        
+        // Convertir a FNC
+        List<Clause> initialClauses = FNCConverter.convertToFNC(sentences);
+        this.clauses.addAll(initialClauses);
+        this.nextClauseId = initialClauses.size() + 1;
+        
+        // Guardar cláusulas iniciales
+        logWriter.println("=== CLAUSULAS EN FORMA NORMAL CONJUNTIVA ===");
+        for (Clause clause : clauses) {
+            logWriter.println("C" + clause.id + ": " + clause);
+        }
+        logWriter.println();
+        logWriter.flush();
+    }
+    
+    public boolean resolve(String query) {
+        logWriter.println("=== ALGORITMO DE RESOLUCIÓN ===");
+        logWriter.println("Consulta: " + query);
+        logWriter.println();
+        
+        // Negar la consulta y agregar a las cláusulas
+        List<Clause> tempClauses = new ArrayList<>(clauses);
+        List<Predicate> queryPreds = FNCConverter.parsePredicates(query, true);
+        Clause negatedQuery = new Clause(queryPreds, nextClauseId++);
+        tempClauses.add(negatedQuery);
+        
+        logWriter.println("Agregando negación de consulta: C" + negatedQuery.id + ": " + negatedQuery);
+        logWriter.println();
+        
+        int step = 1;
+        Set<String> usedPairs = new HashSet<>();
+        
+        while (true) {
+            boolean newClauseGenerated = false;
+            
+            for (int i = 0; i < tempClauses.size(); i++) {
+                for (int j = i + 1; j < tempClauses.size(); j++) {
+                    Clause c1 = tempClauses.get(i);
+                    Clause c2 = tempClauses.get(j);
+                    
+                    String pairKey = Math.min(c1.id, c2.id) + "-" + Math.max(c1.id, c2.id);
+                    if (usedPairs.contains(pairKey)) continue;
+                    
+                    Clause resolvent = resolveClauses(c1, c2);
+                    if (resolvent != null) {
+                        usedPairs.add(pairKey);
+                        
+                        logWriter.println("Paso " + step++ + ":");
+                        logWriter.println("Resolviendo C" + c1.id + " y C" + c2.id);
+                        logWriter.println("C" + c1.id + ": " + c1);
+                        logWriter.println("C" + c2.id + ": " + c2);
+                        logWriter.println("Resolvente: " + resolvent);
+                        logWriter.println();
+                        logWriter.flush();
+                        
+                        if (resolvent.predicates.isEmpty()) {
+                            logWriter.println("¡Se encontró la cláusula vacía! La consulta es verdadera.");
+                            logWriter.close();
+                            return true;
+                        }
+                        
+                        // Verificar si la cláusula ya existe
+                        boolean exists = false;
+                        for (Clause existing : tempClauses) {
+                            if (existing.equals(resolvent)) {
+                                exists = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!exists) {
+                            resolvent.id = nextClauseId++;
+                            tempClauses.add(resolvent);
+                            newClauseGenerated = true;
+                        }
+                    }
+                }
+            }
+            
+            if (!newClauseGenerated) {
+                logWriter.println("No se pueden generar más cláusulas. La consulta es falsa.");
+                logWriter.close();
+                return false;
+            }
+        }
+    }
+    
+    private Clause resolveClauses(Clause c1, Clause c2) {
+        for (Predicate p1 : c1.predicates) {
+            for (Predicate p2 : c2.predicates) {
+                if (p1.name.equals(p2.name) && p1.negated != p2.negated) {
+                    Map<String, Term> substitution = Unifier.unify(p1, p2);
+                    if (substitution != null) {
+                        // Crear resolvente
+                        List<Predicate> newPredicates = new ArrayList<>();
+                        
+                        // Agregar todos los predicados de c1 excepto p1
+                        for (Predicate pred : c1.predicates) {
+                            if (!pred.equals(p1)) {
+                                newPredicates.add(Unifier.applySubstitution(pred, substitution));
+                            }
+                        }
+                        
+                        // Agregar todos los predicados de c2 excepto p2
+                        for (Predicate pred : c2.predicates) {
+                            if (!pred.equals(p2)) {
+                                newPredicates.add(Unifier.applySubstitution(pred, substitution));
+                            }
+                        }
+                        
+                        // Eliminar duplicados
+                        List<Predicate> uniquePreds = new ArrayList<>();
+                        for (Predicate pred : newPredicates) {
+                            if (!containsPredicate(uniquePreds, pred)) {
+                                uniquePreds.add(pred);
+                            }
+                        }
+                        
+                        return new Clause(uniquePreds, -1);     // ID temporal
+                    }
+                }
+            }
+        }
+        return null;
+    }
+    
+    private boolean containsPredicate(List<Predicate> list, Predicate pred) {
+        for (Predicate p : list) {
+            if (p.equals(pred)) return true;
+        }
+        return false;
+    }
+}
