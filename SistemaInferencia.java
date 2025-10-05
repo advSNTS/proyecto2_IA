@@ -221,3 +221,141 @@ class Unifier {
         return false;
     }
 }
+
+//-----Convertidor a Forma Normal Conjuntiva (FNC)-----
+
+// Clase para convertir a Forma Normal Conjuntiva
+class FNCConverter {
+    
+    public static List<Clause> convertToFNC(List<String> sentences) {
+        List<Clause> clauses = new ArrayList<>();
+        int clauseId = 1;
+        
+        for (String sentence : sentences) {
+            List<Clause> sentenceClauses = processSentence(sentence, clauseId);
+            clauses.addAll(sentenceClauses);
+            clauseId += sentenceClauses.size();
+        }
+        
+        return standardizeVariables(clauses);
+    }
+    
+    private static List<Clause> standardizeVariables(List<Clause> clauses) {
+        List<Clause> standardized = new ArrayList<>();
+        int varCounter = 1;
+        
+        for (Clause clause : clauses) {
+            Map<String, String> varMap = new HashMap<>();
+            List<Predicate> newPredicates = new ArrayList<>();
+            
+            for (Predicate pred : clause.predicates) {
+                List<Term> newTerms = new ArrayList<>();
+                for (Term term : pred.terms) {
+                    if (term.isVariable) {
+                        if (!varMap.containsKey(term.name)) {
+                            varMap.put(term.name, "v" + varCounter++);
+                        }
+                        newTerms.add(new Term(varMap.get(term.name), true));
+                    } else {
+                        newTerms.add(term.copy());
+                    }
+                }
+                newPredicates.add(new Predicate(pred.name, newTerms, pred.negated));
+            }
+            standardized.add(new Clause(newPredicates, clause.id));
+        }
+        
+        return standardized;
+    }
+    
+    private static List<Clause> processSentence(String sentence, int startId) {
+        List<Clause> clauses = new ArrayList<>();
+        sentence = sentence.trim();     // Eliminar espacios en blanco extra
+        
+        // Procesar diferentes tipos de sentencias
+        if (sentence.contains("⇒")) {
+            // Implicación: A ⇒ B se convierte a ¬A ∨ B
+            String[] parts = sentence.split("⇒", 2);
+            String left = parts[0].trim();
+            String right = parts[1].trim();
+            
+            List<Predicate> leftPreds = extractPredicates(left, true);
+            List<Predicate> rightPreds = extractPredicates(right, false);
+            
+            List<Predicate> allPreds = new ArrayList<>();
+            allPreds.addAll(leftPreds);
+            allPreds.addAll(rightPreds);
+            
+            clauses.add(new Clause(allPreds, startId));
+            
+        } else if (sentence.contains("∀")) {
+            // Cuantificador universal - eliminar y procesar
+            sentence = removeQuantifiers(sentence);
+            clauses.addAll(processSentence(sentence, startId));
+            
+        } else if (sentence.contains("∧")) {
+            // Conjunción: separar en múltiples cláusulas
+            String[] conjunctions = sentence.split("∧");
+            for (String conj : conjunctions) {
+                List<Predicate> preds = extractPredicates(conj.trim(), false);
+                clauses.add(new Clause(preds, startId++));
+            }
+        } else {
+             // Predicado simple
+            List<Predicate> preds = extractPredicates(sentence, false);
+            clauses.add(new Clause(preds, startId));
+        }
+        
+        return clauses;
+    }
+    
+    private static String removeQuantifiers(String sentence) {
+        return sentence.replaceAll("∀[a-zA-Z]", "").replaceAll("∃[a-zA-Z]", "").trim();
+    }
+    
+    private static List<Predicate> extractPredicates(String text, boolean negate) {
+        List<Predicate> predicates = new ArrayList<>();
+        
+        // Manejar negación
+        if (text.startsWith("¬")) {
+            negate = !negate;
+            text = text.substring(1).trim();
+        }
+        
+        // Verificar si es un predicado con parámetros
+        if (text.contains("(") && text.contains(")")) {
+            Pattern pattern = Pattern.compile("([a-zA-Z]+)\\(([^)]+)\\)");
+            Matcher matcher = pattern.matcher(text);
+            
+            while (matcher.find()) {
+                String predName = matcher.group(1);
+                String params = matcher.group(2);
+                List<Term> terms = parseTerms(params);
+                predicates.add(new Predicate(predName, terms, negate));
+            }
+        } else {
+            // Predicado sin parámetros
+            predicates.add(new Predicate(text, new ArrayList<>(), negate));
+        }
+        
+        return predicates;
+    }
+    
+    private static List<Term> parseTerms(String params) {
+        List<Term> terms = new ArrayList<>();
+        String[] termStrs = params.split(",");
+        
+        for (String termStr : termStrs) {
+            termStr = termStr.trim();
+            // Determinar si es variable minúscula o constante mayúscula
+            boolean isVariable = Character.isLowerCase(termStr.charAt(0));
+            terms.add(new Term(termStr, isVariable));
+        }
+        
+        return terms;
+    }
+    
+    public static List<Predicate> parsePredicates(String text, boolean negate) {
+        return extractPredicates(text, negate);
+    }
+}
