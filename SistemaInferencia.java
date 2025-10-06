@@ -508,3 +508,104 @@ class ResolutionEngine {
         return false;
     }
 }
+
+
+//-----Clase Principal con Ejemplos-----
+public class SistemaInferencia {
+    
+    public static void main(String[] args) {
+        try {
+            System.out.println("=== EJEMPLO MARCO ODIA A CÉSAR ===");
+            testMarcoCesar();
+            
+            System.out.println("\n=== TEOREMA DE VALIDACIÓN ADICIONAL ===");
+            testTeoremaMortal();
+            
+            System.out.println("\n=== TEOREMA DE TRANSITIVIDAD BIOLÓGICA ===");
+            testTeoremaGatos();
+            
+            System.out.println("\n=== TEOREMA SILOGÍSTICO CON EXISTENCIALES ===");
+            testTeoremaLeones();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    public static void testMarcoCesar() throws IOException {
+        List<String> knowledgeBase = Arrays.asList(
+            "Hombre(Marco)",
+            "Pompeyano(Marco)",
+            "∀x Pompeyano(x) ⇒ Romano(x)",
+            "Gobernante(Cesar)",
+            "∀x Romano(x) ⇒ Leal(x, Cesar) ∨ Odia(x, Cesar)",
+            "∀x ∀y Hombre(x) ∧ Gobernante(y) ∧ IntentaAsesinar(x, y) ⇒ ¬Leal(x, y)",
+            "IntentaAsesinar(Marco, Cesar)"
+        );
+        
+        ResolutionEngine engine = new ResolutionEngine();
+        engine.initialize(knowledgeBase, "marco_cesar_log.txt");
+        
+        boolean result = engine.resolve("Odia(Marco, Cesar)");
+        System.out.println("¿Odia Marco a César? " + result);
+    }
+    
+    public static void testTeoremaMortal() throws IOException {
+        // Teorema: Todos los humanos son mortales, Sócrates es humano, por lo tanto Sócrates es mortal
+        // Referencia: Lógica clásica aristotélica
+        List<String> knowledgeBase = Arrays.asList(
+            "∀x Humano(x) ⇒ Mortal(x)",
+            "Humano(Socrates)"
+        );
+        
+        ResolutionEngine engine = new ResolutionEngine();
+        engine.initialize(knowledgeBase, "socrates_log.txt");
+        
+        boolean result = engine.resolve("Mortal(Socrates)");
+        System.out.println("¿Es Sócrates mortal? " + result);
+    }
+
+    public static void testTeoremaGatos() throws IOException {
+        // Teorema: Transitividad de la relación de subconjunto en categorías biológicas
+        // ∀x Gato(x) ⇒ Mamifero(x)
+        // ∀x Mamifero(x) ⇒ Animal(x)
+        // ∴ ∀x Gato(x) ⇒ Animal(x)
+        
+        List<String> knowledgeBase = Arrays.asList(
+            "∀x Gato(x) ⇒ Mamifero(x)",
+            "∀x Mamifero(x) ⇒ Animal(x)"
+        );
+        
+        ResolutionEngine engine = new ResolutionEngine();
+        engine.initialize(knowledgeBase, "gatos_animales_log.txt");
+        
+        boolean result = engine.resolve("Gato(Felix) ⇒ Animal(Felix)");
+        System.out.println("¿Todos los gatos son animales? " + result);
+    }
+
+    public static void testTeoremaLeones() throws IOException {
+        // Teorema silogístico con cuantificador existencial
+        // ∀x Leon(x) ⇒ Felino(x)
+        // ∀x Felino(x) ⇒ Mamifero(x)
+        // ∃x Leon(x) ∧ Animal(x)
+        // ∴ ∃x Animal(x) ∧ Mamifero(x)
+        
+        List<String> knowledgeBase = Arrays.asList(
+            "∀x Leon(x) ⇒ Felino(x)",
+            "∀x Felino(x) ⇒ Mamifero(x)", 
+            "Leon(Simba) ∧ Animal(Simba)"  // Representando ∃x Leon(x) ∧ Animal(x)
+        );
+        
+        ResolutionEngine engine = new ResolutionEngine();
+        engine.initialize(knowledgeBase, "leones_mamiferos_log.txt");
+        
+        boolean result = engine.resolve("Animal(Simba) ∧ Mamifero(Simba)");
+        System.out.println("¿Algunos animales son mamíferos? " + result);
+    }
+}
+
+/*Referencia de caso de pruebas:
+    Libro: "Logic in Computer Science: Modelling and Reasoning about Systems"
+    Autores: Michael Huth y Mark Ryan
+    Editorial: Cambridge University Press, 2004
+    Página: 89 (Sección 2.3 - First-order logic) */
